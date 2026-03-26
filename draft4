@@ -1,0 +1,54 @@
+import random
+
+COLORS = ["Red", "Blue", "Green", "Yellow"]
+NUMBERS = list(range(10))
+SKIP = "Skip"
+
+PLAYER_NAMES = {
+    0: "Player 1 (Minimax - Defensive)",
+    1: "Player 2 (Expectimax - Offensive)",
+    2: "Player 3"
+}
+
+class Card:
+    def __init__(self, color, value):
+        self.color = color
+        self.value = value
+
+    def is_skip(self):
+        return self.value == SKIP
+
+    def __repr__(self):
+        return f"{self.color} {self.value}"
+
+def build_deck():
+    deck = []
+    for color in COLORS:
+        for num in NUMBERS:
+            deck.append(Card(color, num))
+        deck.append(Card(color, SKIP))
+        deck.append(Card(color, SKIP))
+    random.shuffle(deck)
+    return deck
+
+
+def draw_card(deck, discard):
+    if not deck: #checking if the deck is not epmty 
+        if len(discard) <= 1: #reshuffle not possible if deck has 0,1 cards, cant shuffle the top card 
+            raise Exception("no cards left")
+        top = discard[-1] #last card in list,top card
+        rest = discard[:-1] #take all except the last element(top card)
+        random.shuffle(rest)  
+        deck.extend(rest) #adding all items of rest in deck(putting rest of the cards back in deck)
+        discard.clear() #remove everyhting from discard pile
+        discard.append(top) #placing top card baxk on top
+    return deck.pop()
+
+def get_valid_moves(hand, top):
+    valid_moves = []
+
+    for c in hand:
+        if c.color == top.color or c.value == top.value:
+            valid_moves.append(c)
+
+    return valid_moves
