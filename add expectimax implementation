@@ -1,0 +1,88 @@
+def exp_value(state, depth, player_id):
+  
+    if not state.deck:
+        return evaluate(state, player_id, "offensive")
+
+    total   = 0
+    n_cards = len(state.deck)
+    p_each  = 1.0 / n_cards
+
+    for card in state.deck:
+        sim = state.clone()
+        sim.hands[sim.current].append(card)
+        sim.current = sim.next_player()
+        total += p_each * expectimax_value(sim, depth, player_id)
+
+    return total
+
+
+def expectimax_value(state, depth, player_id):
+        #MAX node if it is our turn
+        #EXP node if it is an opponent turn (average, not worst-case)
+    
+    if state.is_terminal() or depth == 0:
+        return evaluate(state, player_id, "offensive")
+
+    current = state.current
+
+    if current == player_id: #our turn => max node 
+        v     = float("-inf")
+        moves = get_valid_moves(state.hands[current], state.top)
+        if len(moves) == 0:
+            moves = ["draw"]
+
+        for move in moves:
+            if move == "draw":
+                result = exp_value(state, depth - 1, player_id)
+            else:
+                successor = apply_move(state, move)
+                result    = expectimax_value(successor, depth - 1, player_id)
+            if result > v:
+                v = result
+        return v
+
+    # opponent turn => average over their legal moves
+    else:
+        moves = get_valid_moves(state.hands[current], state.top)
+        if len(moves) == 0:
+            moves = ["draw"]
+
+        total = 0
+        for move in moves:
+            successor = apply_move(state, move)
+            total    += expectimax_value(successor, depth - 1, player_id)
+
+        return total / len(moves)
+
+
+class ExpectimaxAgent:
+    def __init__(self, pid, depth=3):
+        self.pid   = pid
+        self.depth = depth
+
+    def choose_move(self, state):
+        moves = get_valid_moves(state.hands[self.pid], state.top)
+        if len(moves) == 0:
+            moves = ["draw"]
+
+        best_move  = moves[0]
+        best_score = float("-inf")
+        scored     = []
+
+        for move in moves:
+            if move == "draw":
+                score = exp_value(state, self.depth - 1, self.pid)
+            else:
+                successor = apply_move(state, move)
+                score     = expectimax_value(successor, self.depth - 1, self.pid)
+
+            scored.append((str(move), round(score, 2)))
+            if score > best_score:
+                best_score = score
+                best_move  = move
+
+        return best_move, scored
+
+print("Expectimax agent defined.")
+print("Implements: expectimax_value() router + exp_value() chance node")
+print("Strategy  : Offensive (weights: own=-4, opp=+3, skip=+2)")
