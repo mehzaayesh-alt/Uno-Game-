@@ -9,7 +9,7 @@ It compares two algorithms: **Minimax (defensive)** and **Expectimax (offensive)
 
 * Match card by **color or number**
 * **Skip card** skips next player
-* If no move → **draw a card**
+* If no move then **draw a card**
 * First player to finish cards wins
 
 ## AI Approach
