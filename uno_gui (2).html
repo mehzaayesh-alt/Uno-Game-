@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UNO AI — Adversarial Search | 24i-2573</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --red:    #e63946;
+    --blue:   #1d7baf;
+    --green:  #2d9e5f;
+    --yellow: #e9a220;
+    --bg:     #0f0f13;
+    --surface:#18181f;
+    --card-bg:#22222c;
+    --border: #2e2e3e;
+    --text:   #e8e8f0;
+    --muted:  #6b6b80;
+    --accent: #7c6dfa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+  }
+  header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+  header h1 span { color: var(--accent); }
+  .roll { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); }
+
+  /* ── LAYOUT ── */
+  .main { display: grid; grid-template-columns: 1fr 340px; gap: 0; height: calc(100vh - 57px); }
+  .board { padding: 20px 24px; overflow-y: auto; }
+  .sidebar { border-left: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── TOP ZONE ── */
+  .top-zone {
+    display: flex; align-items: center; justify-content: center; gap: 24px;
+    background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border);
+    padding: 20px 28px; margin-bottom: 16px;
+  }
+  .top-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; text-align: center; }
+
+  /* ── CARD ── */
+  .card {
+    width: 60px; height: 88px;
+    border-radius: 10px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-weight: 700; font-size: 18px;
+    position: relative;
+    border: 2px solid rgba(255,255,255,0.15);
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .card:hover { transform: translateY(-5px); }
+  .card.valid { box-shadow: 0 0 0 3px #1d9e75; }
+  .card.valid:hover { transform: translateY(-10px); box-shadow: 0 8px 24px rgba(29,158,117,0.4), 0 0 0 3px #1d9e75; }
+  .card.selected { transform: translateY(-14px); box-shadow: 0 0 0 3px #7c6dfa; }
+  .card.face-down { background: #2a2560 !important; border-color: #3d357a; cursor: default; }
+  .card.face-down:hover { transform: none; }
+  .card-corner { font-size: 9px; position: absolute; top: 5px; left: 6px; font-weight: 500; opacity: 0.9; }
+  .card-val { font-size: 20px; font-weight: 800; }
+  .card-skip { font-size: 22px; }
+
+  .color-Red    { background: linear-gradient(135deg, #c0392b, #e74c3c); }
+  .color-Blue   { background: linear-gradient(135deg, #1565c0, #1976d2); }
+  .color-Green  { background: linear-gradient(135deg, #1b5e20, #2e7d32); }
+  .color-Yellow { background: linear-gradient(135deg, #e65100, #f57c00); color: #fff5e6; }
+
+  /* ── PLAYER ROWS ── */
+  .player-row {
+    border-radius: 12px; border: 1px solid var(--border);
+    padding: 14px 16px; margin-bottom: 10px;
+    background: var(--card-bg);
+    transition: border-color 0.2s;
+  }
+  .player-row.active { border-color: var(--accent); }
+  .player-row.human-active { border-color: #1d9e75; }
+  .player-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .player-name { font-size: 13px; font-weight: 700; }
+  .player-algo { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--muted); }
+  .card-count {
+    font-size: 12px; font-family: 'JetBrains Mono', monospace;
+    background: var(--border); padding: 3px 8px; border-radius: 20px;
+  }
+  .hand-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: flex-end; min-height: 55px; }
+
+  /* ── DECK ZONE ── */
+  .deck-box {
+    text-align: center; cursor: pointer;
+  }
+  .deck-card {
+    width: 60px; height: 88px; border-radius: 10px;
+    background: #2a2560; border: 2px solid #3d357a;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; margin: 0 auto 6px;
+    transition: transform 0.15s, box-shadow 0.15s;
+    cursor: pointer;
+  }
+  .deck-card:hover { transform: translateY(-4px); box-shadow: 0 6px 20px rgba(124,109,250,0.3); }
+  .deck-count { font-size: 12px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  /* ── STATUS BAR ── */
+  .status-bar {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 16px;
+    font-size: 13px; color: var(--text);
+    margin-bottom: 16px; min-height: 42px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+  /* ── CONTROLS ── */
+  .controls { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .btn {
+    padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 700;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text); cursor: pointer; font-family: 'Syne', sans-serif;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: var(--border); }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #6b5ce7; }
+  .btn-danger { background: #7f1d1d; border-color: #dc2626; color: #fca5a5; }
+  .btn-success { background: #14532d; border-color: #16a34a; color: #86efac; }
+  .speed-row { display: flex; align-items: center; gap: 10px; }
+  .speed-row label { font-size: 12px; color: var(--muted); }
+  input[type=range] { width: 100px; accent-color: var(--accent); }
+
+  /* ── SIDEBAR ── */
+  .sidebar-title {
+    padding: 14px 16px; font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .log-wrap { flex: 1; overflow-y: auto; padding: 8px 12px; }
+  .log-entry {
+    padding: 7px 10px; border-radius: 7px; margin-bottom: 5px;
+    font-size: 11px; font-family: 'JetBrains Mono', monospace;
+    border-left: 3px solid transparent;
+    background: var(--card-bg);
+    line-height: 1.6;
+  }
+  .log-entry.p0 { border-left-color: #2563eb; }
+  .log-entry.p1 { border-left-color: #dc2626; }
+  .log-entry.p2 { border-left-color: #16a34a; }
+  .log-entry.system { border-left-color: var(--accent); background: rgba(124,109,250,0.08); }
+  .log-entry.skip { border-left-color: var(--yellow); }
+  .log-turn { color: var(--muted); font-size: 10px; }
+  .log-action { color: var(--text); margin-top: 2px; }
+  .log-scores { color: var(--muted); font-size: 10px; margin-top: 3px; }
+  .log-best { color: #4ade80; }
+
+  /* ── SCOREBOARD ── */
+  .scoreboard {
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+  }
+  .score-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .score-name { font-size: 11px; color: var(--muted); }
+  .score-val { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+  /* ── WIN SCREEN ── */
+  .win-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    align-items: center; justify-content: center;
+    z-index: 100; flex-direction: column; gap: 16px;
+  }
+  .win-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 40px 56px; text-align: center;
+    max-width: 420px;
+  }
+  .win-title { font-size: 32px; font-weight: 800; margin-bottom: 8px; }
+  .win-sub { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
+
+  /* ── HINT ── */
+  .hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* ── MODE TOGGLE ── */
+  .mode-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .mode-btn { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
+  .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .no-valid { font-size: 12px; color: #f87171; margin-top: 8px; display: none; }
+
+  /* ── TREE PANEL ── */
+  .tree-panel {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    display: none; max-height: 160px; overflow-y: auto;
+  }
+  .tree-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid var(--border); }
+  .tree-row:last-child { border-bottom: none; }
+  .tree-best { color: #4ade80; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>UNO <span>AI</span> — Adversarial Search</h1>
+  <div class="roll">24i-2573 · DS-B · FAST NUCES Islamabad</div>
+</header>
+
+<div class="main">
+<!-- ── BOARD ── -->
+<div class="board">
+
+  <div class="mode-row">
+    <span style="font-size:12px;color:var(--muted)">Mode:</span>
+    <button class="mode-btn active" id="mode-sim" onclick="setMode('sim')">Simulation (3 AIs)</button>
+    <button class="mode-btn" id="mode-manual" onclick="setMode('manual')">Manual (You = P3)</button>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" onclick="startGame()">Deal &amp; Start</button>
+    <button class="btn" id="step-btn" onclick="stepGame()" style="display:none">Step</button>
+    <button class="btn btn-success" id="auto-btn" onclick="toggleAuto()" style="display:none">Auto Play</button>
+    <button class="btn" onclick="resetGame()">Reset</button>
+    <div class="speed-row">
+      <label>Speed</label>
+      <input type="range" id="speed-sl" min="100" max="1500" value="700" step="100">
+      <span id="speed-lbl" style="font-size:11px;color:var(--muted)">700ms</span>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-msg">Press "Deal &amp; Start" to begin a new game.</span>
+  </div>
+
+  <!-- Tree panel (AI decisions) -->
+  <div class="tree-panel" id="tree-panel">
+    <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px" id="tree-header">Decision Tree</div>
+    <div id="tree-rows"></div>
+  </div>
+
+  <!-- Top card + deck -->
+  <div class="top-zone">
+    <div>
+      <div class="top-label">Top Card</div>
+      <div id="top-card-div"></div>
+    </div>
+    <div class="deck-box" onclick="humanDraw()">
+      <div class="top-label">Draw Deck</div>
+      <div class="deck-card" id="deck-icon">🂠</div>
+      <div class="deck-count" id="deck-count">— cards</div>
+    </div>
+  </div>
+
+  <!-- Player rows -->
+  <div class="player-row" id="row-p0">
+    <div class="player-head">
+      <div>
+        <div class="player-name">P1 — Minimax</div>
+        <div class="player-algo">Defensive · depth=3</div>
+      </div>
+      <div class="card-count" id="cnt-p0">5</div>
+    </div>
+    <div class="hand-row" id="hand-p0"></div>
+  </div>
+
+  <div class="player-row" id="row-p1">
+    <div class="player-head">
+      <div>
+        <div class="player-name">P2 — Expectimax</div>
+        <div class="player-algo">Offensive · depth=3</div>
+      </div>
+      <div class="card-count" id="cnt-p1">5</div>
+    </div>
+    <div class="hand-row" id="hand-p1"></div>
+  </div>
+
+  <div class="player-row" id="row-p2">
+    <div class="player-head">
+      <div>
+        <div class="player-name" id="p3-name-label">P3 — Minimax (Baseline)</div>
+        <div class="player-algo" id="p3-algo-label">Simulation</div>
+      </div>
+      <div class="card-count" id="cnt-p2">5</div>
+    </div>
+    <div class="hand-row" id="hand-p2"></div>
+    <div class="no-valid" id="no-valid-msg">No valid card — tap the deck to draw</div>
+    <div class="hint" id="hint-msg" style="display:none">Tap a glowing card to play it, or tap the deck to draw.</div>
+  </div>
+
+</div>
+
+<!-- ── SIDEBAR ── -->
+<div class="sidebar">
+  <div class="sidebar-title">Turn Log &amp; AI Tree</div>
+  <div class="log-wrap" id="log-wrap"></div>
+  <div class="scoreboard">
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Wins (this session)</div>
+    <div class="score-row"><span class="score-name">P1 Minimax</span><span class="score-val" id="sc-p0">0</span></div>
+    <div class="score-row"><span class="score-name">P2 Expectimax</span><span class="score-val" id="sc-p1">0</span></div>
+    <div class="score-row"><span class="score-name">P3</span><span class="score-val" id="sc-p2">0</span></div>
+  </div>
+</div>
+</div>
+
+<!-- Win overlay -->
+<div class="win-overlay" id="win-overlay">
+  <div class="win-box">
+    <div class="win-title" id="win-title">🏆</div>
+    <div class="win-sub" id="win-sub"></div>
+    <button class="btn btn-primary" onclick="resetGame()" style="margin-right:8px">New Game</button>
+    <button class="btn" onclick="closeWin()">Close</button>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   CONSTANTS & STATE
+═══════════════════════════════════════════════════ */
+const COLORS  = ["Red","Blue","Green","Yellow"];
+const NUMBERS = [0,1,2,3,4,5,6,7,8,9];
+const SKIP    = "Skip";
+
+let G = null;          // game state
+let autoTimer = null;
+let isAuto    = false;
+let gameMode  = "sim"; // "sim" | "manual"
+let turn      = 0;
+let winCounts = {0:0, 1:0, 2:0};
+let gameOver  = false;
+
+/* ═══════════════════════════════════════════════════
+   CARD HELPERS
+═══════════════════════════════════════════════════ */
+function cardKey(c)   { return c.color + "_" + c.value; }
+function isSkip(c)    { return c.value === SKIP; }
+function cardStr(c)   { return c.color + " " + c.value; }
+
+function validMoves(hand, top) {
+  let v = [];
+  for (let c of hand) {
+    if (c.color === top.color || c.value === top.value) v.push(c);
+  }
+  return v;
+}
+
+/* ═══════════════════════════════════════════════════
+   DECK
+═══════════════════════════════════════════════════ */
+function buildDeck() {
+  let deck = [];
+  for (let col of COLORS) {
+    for (let n of NUMBERS) deck.push({color:col, value:n});
+    deck.push({color:col, value:SKIP});
+    deck.push({color:col, value:SKIP});
+  }
+  // Fisher-Yates shuffle
+  for (let i = deck.length-1; i > 0; i--) {
+    let j = Math.floor(Math.random()*(i+1));
+    [deck[i],deck[j]] = [deck[j],deck[i]];
+  }
+  return deck;
+}
+
+function drawFromDeck(deck, discard) {
+  if (deck.length === 0) {
+    let top  = discard[discard.length-1];
+    let rest = discard.slice(0, discard.length-1);
+    for (let i=rest.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[rest[i],rest[j]]=[rest[j],rest[i]];}
+    deck.push(...rest);
+    discard.length = 0;
+    discard.push(top);
+  }
+  return deck.pop();
+}
+
+/* ═══════════════════════════════════════════════════
+   GAME STATE CLONE & APPLY
+═══════════════════════════════════════════════════ */
+function cloneState(s) {
+  return {
+    hands:   {0:[...s.hands[0]], 1:[...s.hands[1]], 2:[...s.hands[2]]},
+    top:     s.top,
+    deck:    [...s.deck],
+    discard: [...s.discard],
+    current: s.current
+  };
+}
+
+function isTerminal(s) {
+  return s.hands[0].length===0 || s.hands[1].length===0 || s.hands[2].length===0;
+}
+
+function winnerOf(s) {
+  for (let p=0;p<3;p++) if (s.hands[p].length===0) return p;
+  return null;
+}
+
+function nextPlayer(s, skip=false) {
+  let nxt = (s.current + 1) % 3;
+  if (skip) nxt = (nxt + 1) % 3;
+  return nxt;
+}
+
+function applyMove(s, move) {
+  s = cloneState(s);
+  let p = s.current;
+  if (move === "draw") {
+    let card = drawFromDeck(s.deck, s.discard);
+    s.hands[p].push(card);
+    s.current = nextPlayer(s);
+    return s;
+  }
+  s.hands[p] = s.hands[p].filter(c => !(c.color===move.color && c.value===move.value));
+  s.discard.push(move);
+  s.top = move;
+  s.current = isSkip(move) ? nextPlayer(s, true) : nextPlayer(s);
+  return s;
+}
+
+/* ═══════════════════════════════════════════════════
+   EVALUATION
+═══════════════════════════════════════════════════ */
+function evaluate(s, pid, mode) {
+  let myCards  = s.hands[pid].length;
+  let oppTotal = 0, oppCount = 0;
+  for (let p=0;p<3;p++) { if(p!==pid){oppTotal+=s.hands[p].length;oppCount++;} }
+  let avgOpp = oppTotal / oppCount;
+  let skips  = s.hands[pid].filter(c=>isSkip(c)).length;
+  if (mode==="defensive") return 50 - 7*myCards + 1.5*avgOpp + 4*skips;
+  if (mode==="offensive") return 50 - 4*myCards + 3*avgOpp  + 2*skips;
+  return 50 - 5*myCards + 2*avgOpp + 3*skips;
+}
+
+/* ═══════════════════════════════════════════════════
+   MINIMAX  (max_value / min_value)
+═══════════════════════════════════════════════════ */
+function maxValue(s, depth, pid) {
+  if (isTerminal(s) || depth===0) return evaluate(s, pid, "defensive");
+  let moves = validMoves(s.hands[s.current], s.top);
+  if (!moves.length) moves = ["draw"];
+  let v = -Infinity;
+  for (let m of moves.slice(0,5)) {
+    let r = minValue(applyMove(s,m), depth-1, pid);
+    if (r > v) v = r;
+  }
+  return v;
+}
+
+function minValue(s, depth, pid) {
+  if (isTerminal(s) || depth===0) return evaluate(s, pid, "defensive");
+  let moves = validMoves(s.hands[s.current], s.top);
+  if (!moves.length) moves = ["draw"];
+  let v = +Infinity;
+  for (let m of moves.slice(0,5)) {
+    let r = maxValue(applyMove(s,m), depth-1, pid);
+    if (r < v) v = r;
+  }
+  return v;
+}
+
+function chooseMinimax(s, pid) {
+  let moves = validMoves(s.hands[pid], s.top);
+  if (!moves.length) moves = ["draw"];
+  let best=null, bestScore=-Infinity, scored=[];
+  for (let m of moves) {
+    let sc = minValue(applyMove(s,m), 2, pid);   // depth 3 total
+    scored.push({move:m, score:sc});
+    if (sc > bestScore) { bestScore=sc; best=m; }
+  }
+  return {move:best, scored};
+}
+
+/* ═══════════════════════════════════════════════════
+   EXPECTIMAX  (expectimaxValue + expValue)
+═══════════════════════════════════════════════════ */
+function expValue(s, depth, pid) {
+  if (!s.deck.length) return evaluate(s, pid, "offensive");
+  let total=0, n=s.deck.length;
+  for (let card of s.deck.slice(0, Math.min(n, 8))) {  // sample for speed
+    let sim = cloneState(s);
+    sim.hands[sim.current].push(card);
+    sim.current = nextPlayer(sim);
+    total += expectimaxValue(sim, depth, pid);
+  }
+  return total / Math.min(n, 8);
+}
+
+function expectimaxValue(s, depth, pid) {
+  if (isTerminal(s) || depth===0) return evaluate(s, pid, "offensive");
+  let cur   = s.current;
+  let moves = validMoves(s.hands[cur], s.top);
+  if (!moves.length) moves = ["draw"];
+
+  if (cur === pid) {
+    // MAX node
+    let v = -Infinity;
+    for (let m of moves.slice(0,5)) {
+      let r = (m==="draw") ? expValue(s, depth-1, pid)
+                           : expectimaxValue(applyMove(s,m), depth-1, pid);
+      if (r > v) v = r;
+    }
+    return v;
+  } else {
+    // Average (random opponent)
+    let total = 0;
+    let sample = moves.slice(0,5);
+    for (let m of sample) total += expectimaxValue(applyMove(s,m), depth-1, pid);
+    return total / sample.length;
+  }
+}
+
+function chooseExpectimax(s, pid) {
+  let moves = validMoves(s.hands[pid], s.top);
+  if (!moves.length) moves = ["draw"];
+  let best=null, bestScore=-Infinity, scored=[];
+  for (let m of moves) {
+    let sc = (m==="draw") ? expValue(s, 2, pid) : expectimaxValue(applyMove(s,m), 2, pid);
+    scored.push({move:m, score:sc});
+    if (sc > bestScore) { bestScore=sc; best=m; }
+  }
+  return {move:best, scored};
+}
+
+/* ═══════════════════════════════════════════════════
+   CARD RENDERING
+═══════════════════════════════════════════════════ */
+function cardHTML(c, extra="", onclick="") {
+  let cls = `card color-${c.color} ${extra}`;
+  let val = (c.value===SKIP) ? '<span class="card-skip">⊘</span>'
+                             : `<span class="card-val">${c.value}</span>`;
+  let click = onclick ? `onclick="${onclick}"` : '';
+  return `<div class="${cls}" ${click} title="${cardStr(c)}">
+    <span class="card-corner">${c.color[0]}</span>
+    ${val}
+  </div>`;
+}
+
+function faceDownHTML(n) {
+  let h = '';
+  let show = Math.min(n, 7);
+  for (let i=0;i<show;i++) h += `<div class="card face-down" title="${n} cards"></div>`;
+  if (n > show) h += `<span style="font-size:12px;color:var(--muted);align-self:center;margin-left:4px">+${n-show}</span>`;
+  return h;
+}
+
+/* ═══════════════════════════════════════════════════
+   RENDER
+═══════════════════════════════════════════════════ */
+function render() {
+  if (!G) return;
+
+  // Top card
+  document.getElementById('top-card-div').innerHTML = cardHTML(G.top, 'top-card', '');
+  document.getElementById('deck-count').textContent = G.deck.length + " cards";
+
+  // Player rows
+  for (let p=0;p<3;p++) {
+    let row = document.getElementById('row-p'+p);
+    row.classList.toggle('active', G.current===p && !(gameMode==='manual' && p===2));
+    row.classList.toggle('human-active', gameMode==='manual' && p===2 && G.current===2);
+    document.getElementById('cnt-p'+p).textContent = G.hands[p].length;
+  }
+
+  // P1 & P2 — face down in manual, face up in sim
+  if (gameMode==='sim') {
+    for (let p=0;p<3;p++) {
+      let hd = document.getElementById('hand-p'+p);
+      hd.innerHTML = G.hands[p].map(c=>cardHTML(c)).join('');
+    }
+  } else {
+    // In manual mode, P1 and P2 are hidden
+    document.getElementById('hand-p0').innerHTML = faceDownHTML(G.hands[0].length);
+    document.getElementById('hand-p1').innerHTML = faceDownHTML(G.hands[1].length);
+
+    // P3 (human) — show hand with valid cards highlighted
+    let hd2 = document.getElementById('hand-p2');
+    if (G.current===2) {
+      let vm = validMoves(G.hands[2], G.top);
+      let vmKeys = new Set(vm.map(cardKey));
+      hd2.innerHTML = G.hands[2].map((c,i) => {
+        let cls = vmKeys.has(cardKey(c)) ? 'valid' : '';
+        return cardHTML(c, cls, vmKeys.has(cardKey(c)) ? `humanPlay(${i})` : '');
+      }).join('');
+      let hasValid = vm.length > 0;
+      document.getElementById('no-valid-msg').style.display = hasValid ? 'none' : 'block';
+      document.getElementById('hint-msg').style.display = 'block';
+    } else {
+      hd2.innerHTML = G.hands[2].map(c=>cardHTML(c)).join('');
+      document.getElementById('no-valid-msg').style.display = 'none';
+      document.getElementById('hint-msg').style.display = 'none';
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   LOG
+═══════════════════════════════════════════════════ */
+function addLog(pid, turnNum, action, scored, isSys=false) {
+  let wrap = document.getElementById('log-wrap');
+  let div  = document.createElement('div');
+  div.className = 'log-entry ' + (isSys ? 'system' : 'p'+pid);
+  let scHTML = '';
+  if (scored && scored.length > 0) {
+    let best = Math.max(...scored.map(s=>s.score));
+    scHTML = '<div class="log-scores">' +
+      scored.map(s => {
+        let mv = s.move==="draw" ? "draw" : cardStr(s.move);
+        let cls = s.score===best ? 'log-best' : '';
+        return `<span class="${cls}">${mv}: ${s.score.toFixed(1)}</span>`;
+      }).join('  ') + '</div>';
+  }
+  div.innerHTML = `<div class="log-turn">Turn ${turnNum}${pid!==undefined&&!isSys?' · '+['P1 Minimax','P2 Expectimax','P3'][pid]:''}</div>
+<div class="log-action">${action}</div>${scHTML}`;
+  wrap.insertBefore(div, wrap.firstChild);
+}
+
+/* ═══════════════════════════════════════════════════
+   TREE PANEL
+═══════════════════════════════════════════════════ */
+function showTree(pid, scored) {
+  let panel = document.getElementById('tree-panel');
+  let names = ['Minimax (Defensive)', 'Expectimax (Offensive)', 'Minimax (Baseline)'];
+  document.getElementById('tree-header').textContent = names[pid] + ' — Considered Moves';
+  let best  = Math.max(...scored.map(s=>s.score));
+  let rows  = scored.map(s => {
+    let mv  = s.move==="draw" ? "draw" : cardStr(s.move);
+    let cls = s.score===best ? 'tree-row tree-best' : 'tree-row';
+    let tag = s.score===best ? ' ← BEST' : '';
+    return `<div class="${cls}"><span>${mv}</span><span>${s.score.toFixed(2)}${tag}</span></div>`;
+  }).join('');
+  document.getElementById('tree-rows').innerHTML = rows;
+  panel.style.display = 'block';
+}
+
+/* ═══════════════════════════════════════════════════
+   STATUS
+═══════════════════════════════════════════════════ */
+function setStatus(msg) {
+  document.getElementById('status-msg').textContent = msg;
+}
+
+/* ═══════════════════════════════════════════════════
+   GAME INIT
+═══════════════════════════════════════════════════ */
+function startGame() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer=null; isAuto=false; }
+  let deck = buildDeck();
+  let hands = {0:[],1:[],2:[]};
+  for (let i=0;i<5;i++) for (let p=0;p<3;p++) hands[p].push(deck.pop());
+  let top;
+  while (true) { top=deck.pop(); if (!isSkip(top)) break; deck.unshift(top); }
+  G = { hands, top, deck, discard:[top], current:0 };
+  turn     = 0;
+  gameOver = false;
+  document.getElementById('log-wrap').innerHTML = '';
+  document.getElementById('tree-panel').style.display='none';
+  document.getElementById('step-btn').style.display='';
+  document.getElementById('auto-btn').style.display='';
+  document.getElementById('auto-btn').textContent='Auto Play';
+  setStatus('Game started! Top card: ' + cardStr(G.top));
+  addLog(undefined, 0, 'New game started. Top: '+cardStr(G.top), null, true);
+  render();
+
+  // If sim mode or first player is AI, kick off
+  if (gameMode==='sim') {
+    // do nothing — user presses step or auto
+  } else {
+    if (G.current !== 2) doAITurn();
+  }
+}
+
+function resetGame() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer=null; isAuto=false; }
+  G=null; gameOver=false; turn=0;
+  document.getElementById('step-btn').style.display='none';
+  document.getElementById('auto-btn').style.display='none';
+  document.getElementById('tree-panel').style.display='none';
+  document.getElementById('win-overlay').style.display='none';
+  document.getElementById('status-msg').textContent='Press "Deal & Start" to begin a new game.';
+  for (let p=0;p<3;p++) {
+    document.getElementById('hand-p'+p).innerHTML='';
+    document.getElementById('cnt-p'+p).textContent='5';
+    document.getElementById('row-p'+p).classList.remove('active','human-active');
+  }
+  document.getElementById('top-card-div').innerHTML='';
+  document.getElementById('deck-count').textContent='— cards';
+  document.getElementById('auto-btn').textContent='Auto Play';
+}
+
+/* ═══════════════════════════════════════════════════
+   STEP / AUTO
+═══════════════════════════════════════════════════ */
+function stepGame() {
+  if (!G || gameOver) return;
+  if (gameMode==='manual' && G.current===2) return; // human's turn
+  executeTurn();
+}
+
+function toggleAuto() {
+  if (!G || gameOver) return;
+  isAuto = !isAuto;
+  document.getElementById('auto-btn').textContent = isAuto ? 'Pause' : 'Auto Play';
+  if (isAuto) scheduleNext();
+}
+
+function scheduleNext() {
+  if (!isAuto || gameOver) return;
+  let delay = parseInt(document.getElementById('speed-sl').value);
+  autoTimer = setTimeout(() => {
+    if (!gameOver && G) {
+      if (gameMode==='manual' && G.current===2) { isAuto=false; document.getElementById('auto-btn').textContent='Auto Play'; return; }
+      executeTurn();
+      if (!gameOver) scheduleNext();
+    }
+  }, delay);
+}
+
+document.getElementById('speed-sl').oninput = function() {
+  document.getElementById('speed-lbl').textContent = this.value + 'ms';
+};
+
+/* ═══════════════════════════════════════════════════
+   EXECUTE ONE TURN
+═══════════════════════════════════════════════════ */
+function executeTurn() {
+  if (!G || gameOver) return;
+  turn++;
+  let p     = G.current;
+  let res   = p===1 ? chooseExpectimax(G, p) : chooseMinimax(G, p);
+  let move  = res.move;
+  let scored= res.scored;
+
+  showTree(p, scored);
+
+  let moveStr = move==="draw" ? "draws a card" : "plays " + cardStr(move);
+  let names   = ['P1 Minimax','P2 Expectimax','P3'];
+
+  if (move!=="draw" && isSkip(move)) {
+    let skippedIdx = (G.current+1)%3;
+    addLog(p, turn, names[p]+' '+moveStr+' → '+names[skippedIdx]+' skipped!', scored);
+    setStatus('Turn '+turn+' · '+names[p]+' plays SKIP — '+names[skippedIdx]+' loses their turn');
+  } else {
+    addLog(p, turn, names[p]+' '+moveStr, scored);
+    setStatus('Turn '+turn+' · '+names[p]+' '+moveStr);
+  }
+
+  G = applyMove(G, move);
+  render();
+
+  let w = winnerOf(G);
+  if (w !== null) { endGame(w); return; }
+}
+
+/* ═══════════════════════════════════════════════════
+   AI TURN (for manual mode, auto-fires AI turns)
+═══════════════════════════════════════════════════ */
+function doAITurn() {
+  if (!G || gameOver || G.current===2) return;
+  let delay = Math.max(300, parseInt(document.getElementById('speed-sl').value));
+  setTimeout(() => {
+    if (!G || gameOver) return;
+    executeTurn();
+    if (!gameOver && G && G.current!==2) doAITurn();
+    else render();
+  }, delay);
+}
+
+/* ═══════════════════════════════════════════════════
+   HUMAN PLAY (manual mode)
+═══════════════════════════════════════════════════ */
+function humanPlay(idx) {
+  if (!G || gameOver || G.current!==2 || gameMode!=='manual') return;
+  let card = G.hands[2][idx];
+  let vm   = validMoves(G.hands[2], G.top);
+  if (!vm.find(c=>c.color===card.color&&c.value===card.value)) return;
+
+  turn++;
+  addLog(2, turn, 'You played '+cardStr(card), []);
+  setStatus('You played '+cardStr(card)+(isSkip(card)?' — Skip activated!':''));
+  G = applyMove(G, card);
+  render();
+
+  let w = winnerOf(G);
+  if (w !== null) { endGame(w); return; }
+  if (G.current!==2) doAITurn();
+}
+
+function humanDraw() {
+  if (!G || gameOver || gameMode!=='manual' || G.current!==2) return;
+  turn++;
+  addLog(2, turn, 'You drew a card', []);
+  setStatus('You drew a card');
+  G = applyMove(G, "draw");
+  render();
+  let w = winnerOf(G);
+  if (w !== null) { endGame(w); return; }
+  if (G.current!==2) doAITurn();
+}
+
+/* ═══════════════════════════════════════════════════
+   GAME OVER
+═══════════════════════════════════════════════════ */
+function endGame(w) {
+  gameOver = true;
+  isAuto   = false;
+  if (autoTimer) { clearInterval(autoTimer); autoTimer=null; }
+  document.getElementById('auto-btn').textContent='Auto Play';
+  winCounts[w]++;
+  for (let p=0;p<3;p++) document.getElementById('sc-p'+p).textContent = winCounts[p];
+  let names = ['P1 Minimax (Defensive)','P2 Expectimax (Offensive)','P3'];
+  let subs  = ['Defensive strategy prevails — hand protected to zero.',
+               'Offensive card-shedding wins again!',
+               gameMode==='manual'?'You beat the AIs!':'Baseline Minimax takes it.'];
+  document.getElementById('win-title').textContent = '🏆 ' + names[w] + ' wins!';
+  document.getElementById('win-sub').textContent   = subs[w] + ' · Turn ' + turn;
+  document.getElementById('win-overlay').style.display='flex';
+  addLog(undefined, turn, '🏆 WINNER: '+names[w], null, true);
+  setStatus('Game over! Winner: '+names[w]+' after '+turn+' turns.');
+}
+
+function closeWin() {
+  document.getElementById('win-overlay').style.display='none';
+}
+
+/* ═══════════════════════════════════════════════════
+   MODE SWITCH
+═══════════════════════════════════════════════════ */
+function setMode(m) {
+  gameMode = m;
+  document.getElementById('mode-sim').classList.toggle('active', m==='sim');
+  document.getElementById('mode-manual').classList.toggle('active', m==='manual');
+  document.getElementById('p3-name-label').textContent = m==='manual' ? 'P3 — You (Human)' : 'P3 — Minimax (Baseline)';
+  document.getElementById('p3-algo-label').textContent = m==='manual' ? 'Manual play' : 'Simulation';
+  resetGame();
+}
+</script>
+</body>
+</html>
