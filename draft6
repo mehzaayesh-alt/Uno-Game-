@@ -1,0 +1,113 @@
+import random 
+class GameState:
+    def __init__(self, hands, top, deck, discard, current=0):
+        self.hands = hands
+        self.top = top
+        self.deck = deck
+        self.discard = discard
+        self.current = current
+
+COLORS = ["Red", "Blue", "Green", "Yellow"]
+NUMBERS = list(range(10))
+SKIP = "Skip"
+
+PLAYER_NAMES = {
+    0: "Player 1 (Minimax - Defensive)",
+    1: "Player 2 (Expectimax - Offensive)",
+    2: "Player 3"
+}
+
+class Card:
+    def __init__(self, color, value):
+        self.color = color
+        self.value = value
+
+    def is_skip(self):
+        return self.value == SKIP
+
+    def __repr__(self):
+        return f"{self.color} {self.value}"
+
+def build_deck():
+    deck = []
+    for color in COLORS:
+        for num in NUMBERS:
+            deck.append(Card(color, num))
+        deck.append(Card(color, SKIP))
+        deck.append(Card(color, SKIP))
+    random.shuffle(deck)
+    return deck
+
+
+def draw_card(deck, discard):
+    if not deck: #checking if the deck is not epmty 
+        if len(discard) <= 1: #reshuffle not possible if deck has 0,1 cards, cant shuffle the top card 
+            raise Exception("no cards left")
+        top = discard[-1] #last card in list,top card
+        rest = discard[:-1] #take all except the last element(top card)
+        random.shuffle(rest)  
+        deck.extend(rest) #adding all items of rest in deck(putting rest of the cards back in deck)
+        discard.clear() #remove everyhting from discard pile
+        discard.append(top) #placing top card baxk on top
+    return deck.pop()
+
+def get_valid_moves(hand, top):
+    valid_moves = []
+
+    for c in hand:
+        if c.color == top.color or c.value == top.value:
+            valid_moves.append(c)
+
+    return valid_moves\
+#  def max-value(state):
+#      if terminal: return utility
+#      v = -inf
+#      for each successor:
+#          v = max(v, min-value(successor))
+#      return v
+#
+#  def min-value(state):
+#      if terminal: return utility
+#      v = +inf
+#      for each successor:
+#          v = min(v, max-value(successor))
+#      return v
+
+def max_value(state, depth, player_id):
+    if state.is_terminal() or depth == 0: #gameover or depth limit reaxhed 
+        return evaluate(state, player_id, "defensive")
+
+    v = float("-inf")
+
+    moves = get_valid_moves(state.hands[state.current], state.top)
+    if len(moves) == 0:
+        moves = ["draw"]
+
+    for move in moves:
+        successor = apply_move(state, move)
+        result    = min_value(successor, depth - 1, player_id)
+
+        if result > v:
+            v = result
+
+    return v
+
+
+def min_value(state, depth, player_id):
+    if state.is_terminal() or depth == 0:
+        return evaluate(state, player_id, "defensive")
+
+    v = float("+inf")
+
+    moves = get_valid_moves(state.hands[state.current], state.top)
+    if len(moves) == 0:
+        moves = ["draw"]
+
+    for move in moves:
+        successor = apply_move(state, move)
+        result    = max_value(successor, depth - 1, player_id)
+
+        if result < v:
+            v = result
+
+    return v
